@@ -1,0 +1,27 @@
+{
+  "name": "hiking-tracker-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ENV=dev node_modules/.bin/supervisor src/index.js"
+  },
+  "author": "Olivier Lando",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^4.6.1",
+    "eslint-config-airbnb-base": "^12.0.0",
+    "eslint-plugin-import": "^2.7.0",
+    "supervisor": "^0.12.0"
+  },
+  "dependencies": {
+    "mongoose": "^4.11.11",
+    "node-hgt": "^1.2.1",
+    "path-from-image": "0.0.3",
+    "request": "^2.81.0",
+    "restify": "^5.0.1",
+    "simplify-js": "^1.2.1",
+    "slug": "^0.9.1"
+  }
+}

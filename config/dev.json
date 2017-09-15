@@ -1,0 +1,24 @@
+{
+    "port": 8088,
+    "paths": {
+        "elevationData": "./data/elevation/"
+    },
+    "database": {
+        "host": "localhost",
+        "name": "mytest"
+    },
+    "allowedOrigins": "*",
+    "tilesProviders": {
+        "ign": {
+            "cache": "./data/tiles-cache/ign",
+            "url": "http://wxs.ign.fr/tpmy6ag1ce2u3mzx0vqeh5jl/geoportail/wmts?service=WMTS&request=GetTile&version=1.0.0&tilematrixset=PM&tilematrix={z}&tilecol={x}&tilerow={y}&layer=GEOGRAPHICALGRIDSYSTEMS.MAPS&format=image/jpeg&style=normal",
+            "auth": {
+                "user": "xxx",
+                "pass": "xxx"
+            }
+        },
+        "sat": {
+            "url": "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        }
+    }
+}
