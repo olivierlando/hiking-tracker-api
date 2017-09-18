@@ -2,54 +2,77 @@ const process = require('process');
 const fs = require('fs');
 const path = require('path');
 const restify = require('restify');
-const Elevation = require('./services/Elevation');
+const mongoose = require('mongoose');
+const bunyan = require('bunyan');
 const HikingsHandlers = require('./handlers/Hikings');
 const TilesHandlers = require('./handlers/Tiles');
 const RoadsHandlers = require('./handlers/Roads');
-const mongoose = require('mongoose');
+const UsersHandlers = require('./handlers/Users');
+const Authentication = require('./services/Authentication');
+const packagejson = require('../package.json');
 
 if (!process.env.ENV || ['dev', 'prod'].indexOf(process.env.ENV) === -1) {
   throw new Error('Missing or invalid ENV variable');
 }
 
 const config = JSON.parse(fs.readFileSync(path.resolve(__dirname, `../config/${process.env.ENV}.json`), 'UTF-8'));
-const elevation = new Elevation(config.paths.elevationData);
-const handlers = {
-  hikings: new HikingsHandlers(config, elevation),
-  roads: new RoadsHandlers(config),
-  tiles: new TilesHandlers(config),
-};
 
-mongoose.connect(`mongodb://${config.database.host}/${config.database.name}`, {
-  useMongoClient: true,
-}).catch((err) => {
-  throw err;
+const log = bunyan.createLogger({
+  name: packagejson.name,
+  level: config.log.level,
+  serializers: bunyan.stdSerializers,
 });
 
+try {
+  mongoose.Promise = global.Promise;
+  mongoose.connect(`mongodb://${config.database.host}/${config.database.name}`, {
+    useMongoClient: true,
+  }).catch((err) => {
+    log.fatal({ err }, "Can't connect to database");
+    process.exit(-1);
+  });
+} catch (err) {
+  log.fatal({ err }, "Can't connect to database");
+  process.exit(-1);
+}
+
 const server = restify.createServer({
-  name: 'hiking-tracker-server',
-  version: '1.0.0',
+  name: packagejson.name,
+  version: packagejson.version,
+  log,
 });
 
 server.use(restify.plugins.acceptParser(server.acceptable));
 server.use(restify.plugins.queryParser());
-server.use(restify.plugins.bodyParser());
+server.use(restify.plugins.oauth2TokenParser());
+server.use(restify.plugins.bodyParser({ mapParams: false }));
 server.use(restify.plugins.gzipResponse());
+server.use(restify.plugins.requestLogger());
+server.use(Authentication.getUserFromRequestToken());
 server.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', config.allowedOrigins);
-  res.header('Access-Control-Allow-Headers', 'X-Requested-With');
+  res.header('Access-Control-Allow-Headers', 'X-Requested-With,Authorization');
   return next();
 });
 
-server.get('/hikings/refresh', (req, res) => handlers.hikings.refreshAll(req, res));
-// server.get('/hikings/:bounds/:lat1/:lng1/:lat2/:lng2', (req, res) => handlers.hikings.getInBounds(req, res));
-server.get('/hikings', (req, res) => handlers.hikings.getAll(req, res));
-server.post('/hikings/:slug', (req, res) => handlers.hikings.update(req, res));
-server.post('/hikings', (req, res) => handlers.hikings.create(req, res));
-server.get('/tile/:provider/:zoom/:x/:y', (req, res) => handlers.tiles.get(req, res));
-server.get('/follow-road/:lat1/:lon1/:lat2/:lon2', (req, res) => handlers.roads.follow('ign', req, res));
+server.on('after', (req, res, next, err) => {
+  if (err) {
+    log.error({ user: req.user, err, body: req.body }, `${req.method} ${req.url}`);
+  } else {
+    log.info({ user: (req.user ? req.user.username : null) }, `${req.method} ${req.url}`);
+  }
+});
+
+server.opts('/(.*)/', (req, res) => {
+  res.send(204);
+});
+
+new HikingsHandlers(server, config).init();
+new UsersHandlers(server, config).init();
+new RoadsHandlers(server, config).init();
+new TilesHandlers(server, config).init();
 
 
 server.listen(config.port, () => {
-  console.log('%s listening at %s', server.name, server.url);
+  log.info(`${server.name} listening at ${server.url}`);
 });

@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ENV=dev node_modules/.bin/supervisor src/index.js"
+    "start": "ENV=dev node_modules/.bin/supervisor src/index.js | node_modules/.bin/bunyan"
   },
   "author": "Olivier Lando",
   "license": "ISC",
@@ -16,11 +16,13 @@
     "supervisor": "^0.12.0"
   },
   "dependencies": {
+    "bunyan": "^1.8.12",
     "mongoose": "^4.11.11",
     "node-hgt": "^1.2.1",
     "path-from-image": "0.0.3",
     "request": "^2.81.0",
     "restify": "^5.0.1",
+    "restify-errors": "^5.0.0",
     "simplify-js": "^1.2.1",
     "slug": "^0.9.1"
   }

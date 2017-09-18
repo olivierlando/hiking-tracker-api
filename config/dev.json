@@ -20,5 +20,9 @@
         "sat": {
             "url": "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         }
+    },
+    "tokenExpirationTime": 604800,
+    "log": {
+        "level": "debug"
     }
 }

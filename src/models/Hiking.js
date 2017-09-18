@@ -8,7 +8,7 @@ const Hiking = mongoose.model('hikings', mongoose.Schema({
   altitudes: [Number],
   bounds: [[Number, Number]],
   points: [{
-    coordinates: [[Number, Number]],
+    coordinates: [Number, Number],
     distance: Number,
     isLinear: Boolean,
     altitude: Number,
@@ -17,4 +17,4 @@ const Hiking = mongoose.model('hikings', mongoose.Schema({
 }));
 
 
-module.exports = { Hiking };
+module.exports = Hiking;

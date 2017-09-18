@@ -1,24 +1,31 @@
 const PathFromImage = require('path-from-image');
+const errors = require('restify-errors');
 const Tiles = require('../services/Tiles');
 const Utils = require('../services/Utils');
 
 class Roads {
-  constructor(config) {
+  constructor(server, config) {
     this.config = config;
+    this.server = server;
   }
 
-  follow(provider, req, res) {
+  init() {
+    this.server.get('/roads/follow/:lat1/:lon1/:lat2/:lon2', this.follow.bind(this));
+  }
+
+  follow(req, res, next) {
     const zoom = 15;
     const pathSimplification = 9;
     const maxDistanceKm = 10;
+    const provider = 'ign';
 
     const [lat1Float, lon1Float, lat2Float, lon2Float] =
       [req.params.lat1, req.params.lon1, req.params.lat2, req.params.lon2].map(c => parseFloat(c));
 
     if (Utils.getDistanceFromLatLon(lat1Float, lon1Float, lat2Float, lon2Float) > maxDistanceKm * 1000) {
-      res.send(500, 'Given locations are too far away');
+      next(new errors.BadRequestError('Given locations are too far away'));
     } else if (!this.config.tilesProviders[provider]) {
-      res.send(500, `Unknown provider: ${provider}`);
+      next(new errors.BadRequestError(`Unknown provider: ${provider}`));
     } else {
       const [topLeftTileId, bottomRightTileId] = Tiles.getTilesBounds(
         1,
@@ -46,6 +53,7 @@ class Roads {
           } else {
             res.send(404, 'No path found');
           }
+          next();
         });
     }
   }

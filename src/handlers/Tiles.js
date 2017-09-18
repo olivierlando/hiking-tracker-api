@@ -1,11 +1,17 @@
+const errors = require('restify-errors');
 const Tiles = require('../services/Tiles');
 
 class TilesHandlers {
-  constructor(config) {
+  constructor(server, config) {
     this.config = config;
+    this.server = server;
   }
 
-  get(req, res) {
+  init() {
+    this.server.get('/tiles/:provider/:zoom/:x/:y', this.get.bind(this));
+  }
+
+  get(req, res, next) {
     if (!this.config.tilesProviders[req.params.provider]) {
       res.send(500, `Unknown provider: ${req.params.provider}`);
     } else {
@@ -18,9 +24,10 @@ class TilesHandlers {
       ).then(
         (data) => {
           res.sendRaw(200, data, { 'Access-Control-Allow-Origin': '*' });
+          next();
         },
         (err) => {
-          res.send(500, err.message);
+          next(new errors.InternalServerError({ err }));
         }
       );
     }

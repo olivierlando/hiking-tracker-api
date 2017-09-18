@@ -1,74 +1,91 @@
+const errors = require('restify-errors');
+const Elevation = require('../services/Elevation');
 const HikingsService = require('../services/Hikings');
-const models = require('../models');
+const HikingModel = require('../models/Hiking');
+const Authentication = require('../services/Authentication');
 
 class Hikings {
-  constructor(config, elevation) {
-    this.elevation = elevation;
+  constructor(server, config) {
+    this.elevation = new Elevation(config.paths.elevationData);
     this.config = config;
+    this.server = server;
   }
 
-  refreshAll(req, res) {
-    models.Hiking.find().select(['name', 'coordinates', 'bounds', 'elevation']).exec((err, hikings) => {
+  init() {
+    this.server.get('/hikings', this.getAll.bind(this));
+    this.server.post('/hikings/refresh', Authentication.isAuthenticated, this.refreshAll.bind(this));
+    this.server.post('/hikings/:slug', Authentication.isAuthenticated, this.update.bind(this));
+    this.server.post('/hikings', Authentication.isAuthenticated, this.create.bind(this));
+  }
+
+  refreshAll(req, res, next) {
+    HikingModel.find().select(['name', 'coordinates', 'bounds', 'elevation']).exec((err, hikings) => {
       hikings.forEach((hiking) => {
-        HikingsService.computeHikingValues(hiking.name, hiking.coordinates, hiking.bounds, this.elevation, (refreshed) => {
-          models.Hiking.update({ _id: hiking['_id'] }, refreshed);
+        HikingsService.computeHikingValues(hiking.name, hiking.coordinates, hiking.bounds, this.elevation, (err, refreshed) => {
+          if (!err) {
+            HikingModel.update({ _id: hiking['_id'] }, refreshed);
+          }
         });
       });
-      res.send('ok');
+      res.send('Hiking refreshed');
+      next();
     });
   }
 
-  create(req, res) {
+  create(req, res, next) {
     const body = JSON.parse(req.body);
-    HikingsService.computeHikingValues(body.name, [], body.bounds, this.elevation, (hiking) => {
-      new models.Hiking(hiking).save((err) => {
-        if (err) throw err;
-        res.send('');
-      });
+    HikingsService.computeHikingValues(body.name, [], body.bounds, this.elevation, (err, hiking) => {
+      if (err) {
+        next(new errors.InternalServerError({ err }, 'Can\'t compute hiking data'));
+      } else {
+        new HikingModel(hiking).save((err) => {
+          if (err) {
+            next(new errors.InternalServerError({ err }, 'Can\'t create hiking'));
+          } else {
+            res.send('Hiking created');
+            next();
+          }
+        });
+      }
     });
   }
 
-
-  update(req, res) {
+  update(req, res, next) {
     const body = JSON.parse(req.body);
-    HikingsService.computeHikingValues(body.name, body.coordinates, body.bounds, this.elevation, (hiking) => {
-      models.Hiking.update(
-        { slug: req.params.slug },
-        hiking,
-        { },
-        (err, count) => {
-          if (err) throw err;
-          res.send(count);
-        }
-      );
+    HikingsService.computeHikingValues(body.name, body.coordinates, body.bounds, this.elevation, (err, hiking) => {
+      if (err) {
+        next(new errors.InternalServerError({ err }, 'Can\'t compute hiking data'));
+      } else {
+        HikingModel.update(
+          { slug: req.params.slug },
+          hiking,
+          { },
+          (err, count) => {
+            if (err || count === 0) {
+              next(new errors.InternalServerError({ err }, 'Can\'t update hiking'));
+            } else {
+              res.send('Hiking updated');
+              next();
+            }
+          }
+        );
+      }
     });
   }
 
-  getAll(req, res) {
-    models.Hiking
+  getAll(req, res, next) {
+    HikingModel
       .find(req.query.slugs ? { slug: { $in: req.query.slugs.split(',') } } : {})
       .select(req.query.fields ? req.query.fields.split(',') : null)
       .exec((err, hikings) => {
-        if (err) throw err;
-        res.send(hikings);
+        if (err) {
+          next(new errors.InternalServerError('Can\'t retrieve hikings'));
+        } else {
+          res.send(hikings);
+          next();
+        }
       });
   }
-
-  // not used
-  // getInBounds(req, res) {
-  //   const lat1 = parseFloat(req.params.lat1);
-  //   const lon1 = parseFloat(req.params.lng1);
-  //   const lat2 = parseFloat(req.params.lat2);
-  //   const lon2 = parseFloat(req.params.lng2);
-
-  //   models.Hiking.find((err, hikings) => {
-  //     if (err) throw err;
-  //     res.send(hikings.filter(d =>
-  //       d.bounds && d.bounds[0][0] >= lat2 &&
-  //       d.bounds[0][1] >= lon2 && d.bounds[1][0] <= lat1 && d.bounds[1][1] <= lon1)
-  //       .map(d => Object.assign(d, { points: [], altitudes: [] })));
-  //   });
-  // }
 }
 
 module.exports = Hikings;
